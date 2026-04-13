@@ -8,6 +8,7 @@ import com.sweetflow.order_ms.entity.OrderStatus;
 import com.sweetflow.order_ms.entity.Product;
 import com.sweetflow.order_ms.exception.OrderNotFoundException;
 import com.sweetflow.order_ms.exception.ProductNotFoundException;
+import com.sweetflow.order_ms.producer.OrderProducer;
 import com.sweetflow.order_ms.repository.OrderRepository;
 import com.sweetflow.order_ms.repository.ProductRepository;
 import jakarta.transaction.Transactional;
@@ -28,6 +29,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final OrderProducer orderProducer;
 
     @Transactional
     public OrderResponseDTO createOrder (OrderRequestDTO orderRequestDTO) {
@@ -67,10 +69,13 @@ public class OrderService {
         order.setTotalValue(totalValue);
 
         Order savedOrder = orderRepository.save(order);
+        OrderResponseDTO response = OrderResponseDTO.fromEntity(savedOrder);
 
-        log.info("Pedido criado com sucesso! Nº do Pedido: {} | Total: R$ {}", savedOrder.getOrderNumber(), savedOrder.getTotalValue());
+        orderProducer.sendOrderEvent(response);
 
-        return OrderResponseDTO.fromEntity(savedOrder);
+        log.info("Pedido criado com sucesso! e enviado ao Kafka! Nº do Pedido: {} | Total: R$ {}", savedOrder.getOrderNumber(), savedOrder.getTotalValue());
+
+        return response;
     }
 
     public OrderResponseDTO getOrderById(UUID id) {
